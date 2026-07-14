@@ -15,3 +15,7 @@ android/.cxx/
 # OS
 .DS_Store
 Thumbs.db
+
+# Saída gerada pelo script de publicação de atualização OTA (regenerada a
+# cada publicação — não precisa ficar versionada)
+scripts/saida-publicacao/

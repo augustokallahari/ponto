@@ -80,3 +80,37 @@ mapeia `código da empresa → URL da API daquela empresa`:
   servidor, nunca pelo navegador) pra criar/atualizar sua própria entrada. Protegido por um token gerado
   junto com o código — só quem tem acesso ao painel daquela empresa consegue atualizar a URL registrada
   para o código dela.
+
+## Atualização OTA (sem gerar um APK novo pra cada correção)
+
+`app.js` e `styles.css` (a lógica e o visual do app) podem ser atualizados **sem reinstalar o APK** —
+o app confere uma atualização assinada digitalmente toda vez que abre com internet, e aplica na
+próxima abertura seguinte.
+
+**Por que é assinado**: sem isso, qualquer um com acesso de escrita a
+`/var/www/html/ponto-directory/app-update/` (nem que seja através de uma falha em *outro* sistema
+hospedado no mesmo servidor, não necessariamente o Ponto) conseguiria fazer todo celular com o app
+instalado rodar código arbitrário. Com a assinatura, só quem tem a **chave privada** — que não fica no
+servidor nem neste repositório, só na máquina de quem publica — consegue gerar uma atualização que o
+app aceita. Se os arquivos forem alterados sem a assinatura correspondente, o app rejeita e continua
+com a versão anterior.
+
+**Publicar uma atualização** (depois de editar `www/app.js` e/ou `www/styles.css`):
+
+```bash
+node scripts/publicar-atualizacao.js <numero-da-versao>
+```
+
+Isso gera `scripts/saida-publicacao/{app.js,styles.css,manifest.json}` (o `manifest.json` já vem com a
+assinatura). Envie os 3 arquivos para `/var/www/html/ponto-directory/app-update/` no servidor
+(sobrescrevendo os anteriores). O número da versão precisa ser sempre **maior** que o da publicação
+anterior.
+
+**A chave de assinatura** vive em `C:/Users/AUGUSTO/pontofacil-signing-key/` (fora deste repositório,
+nunca commitada). Se essa pasta for perdida, não tem como recuperar — seria preciso gerar um par de
+chaves novo, atualizar a chave pública em `www/loader.js` e lançar um APK novo (só esse arquivo em
+si — `loader.js` — não é atualizável via OTA, de propósito, já que ele é quem confere a assinatura).
+
+**Limitação importante**: só `app.js`/`styles.css` são atualizáveis assim. Mudanças em `index.html`
+(novas telas/elementos) ou qualquer coisa nativa (novas permissões, novos plugins do Capacitor) ainda
+exigem gerar um APK novo pelo GitHub Actions, como antes.

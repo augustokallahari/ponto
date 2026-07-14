@@ -69,7 +69,14 @@ function distanciaEuclidiana(a, b) {
 }
 
 // ---------- inicialização ----------
-document.addEventListener('DOMContentLoaded', init);
+// app.js agora é injetado dinamicamente pelo loader.js (pra permitir
+// atualização OTA), então o DOMContentLoaded pode já ter disparado antes
+// deste script carregar — por isso checamos o document.readyState também.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 
 async function init() {
   API_BASE = lerJSON(LS_API_BASE, null);
