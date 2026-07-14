@@ -644,6 +644,7 @@ async function tentarEnviar(registro) {
 let sincronizando = false;
 async function tentarSincronizar() {
   revalidarEmpresa();
+  verificarFolhaPendente();
 
   if (sincronizando || filaPendente.length === 0) return;
   if (navigator.onLine === false) return;
