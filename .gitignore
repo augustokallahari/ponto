@@ -1,0 +1,17 @@
+node_modules/
+
+# Android build outputs
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/.idea/
+android/*.iml
+android/app/*.iml
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/
+
+# OS
+.DS_Store
+Thumbs.db

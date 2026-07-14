@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>PontoFácil</title>
+<link rel="stylesheet" href="styles.css">
+<script src="face-api.min.js"></script>
+</head>
+<body>
+
+<!-- ============ TELA: PAREAMENTO (primeira vez) ============ -->
+<section id="tela-pareamento" class="tela">
+  <div class="logo">PONTO<span>FÁCIL</span></div>
+  <p class="subtitulo">Vamos vincular este celular a você. Isso só precisa ser feito uma vez.</p>
+
+  <div class="campo-busca">
+    <input type="text" id="input-busca" placeholder="Digite seu nome..." autocomplete="off">
+  </div>
+  <div id="resultados-busca" class="lista-resultados"></div>
+
+  <div id="confirmacao-pareamento" class="card-confirmacao oculto">
+    <p>Confirma que você é:</p>
+    <h2 id="nome-confirmar"></h2>
+    <p id="cargo-confirmar" class="muted"></p>
+    <div class="botoes-confirmacao">
+      <button id="btn-confirmar-pareamento" class="btn btn-primario">Sim, sou eu</button>
+      <button id="btn-cancelar-pareamento" class="btn btn-secundario">Cancelar</button>
+    </div>
+  </div>
+
+  <p id="erro-pareamento" class="mensagem-erro oculto"></p>
+</section>
+
+<!-- ============ TELA: CADASTRO FACIAL (se ainda não tem rosto salvo) ============ -->
+<section id="tela-cadastro-facial" class="tela oculto">
+  <div class="logo">PONTO<span>FÁCIL</span></div>
+  <p class="subtitulo">Não encontramos seu rosto cadastrado no sistema. Peça a um administrador para
+    cadastrar sua foto facial antes de usar o reconhecimento automático.</p>
+  <button id="btn-pular-facial" class="btn btn-secundario">Entendi, continuar mesmo assim</button>
+</section>
+
+<!-- ============ TELA: PRINCIPAL ============ -->
+<section id="tela-principal" class="tela oculto">
+  <header>
+    <div>
+      <div class="logo pequeno">PONTO<span>FÁCIL</span></div>
+      <div id="nome-funcionario" class="nome-funcionario"></div>
+    </div>
+    <div class="header-direita">
+      <div id="relogio" class="relogio">--:--:--</div>
+      <div id="data-hoje" class="data-hoje"></div>
+    </div>
+  </header>
+
+  <div id="badge-pendencias" class="badge-pendencias oculto">
+    🕓 <span id="qtd-pendencias">0</span> registro(s) pendente(s) de sincronização
+    <button id="btn-sync-manual" class="btn-link">sincronizar agora</button>
+  </div>
+
+  <div class="camera-wrapper">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="canvas-overlay"></canvas>
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+    <div id="scan-line" class="scan-line"></div>
+  </div>
+
+  <div id="status-camera" class="status-camera aguardando">Toque no botão para bater o ponto</div>
+  <div id="gps-bar" class="gps-bar aguardando">📍 Obtendo localização...</div>
+
+  <button id="btn-bater-ponto" class="btn-bater-ponto" disabled>Carregando...</button>
+
+  <div id="resumo-hoje" class="resumo-hoje"></div>
+
+  <button id="btn-desvincular" class="btn-link muted">Desvincular este celular</button>
+</section>
+
+<div id="toast" class="toast oculto"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

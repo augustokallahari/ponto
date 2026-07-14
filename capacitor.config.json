@@ -1,0 +1,9 @@
+{
+  "appId": "br.com.kallahari.pontofacil",
+  "appName": "PontoFácil",
+  "webDir": "www",
+  "backgroundColor": "#0a0a0f",
+  "android": {
+    "allowMixedContent": false
+  }
+}
