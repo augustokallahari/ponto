@@ -1,12 +1,18 @@
-# PontoFácil — App Android (self-service, offline-first)
+# PontoFácil — App Android (self-service, offline-first, multi-empresa)
 
 App Android para os funcionários baterem o próprio ponto pelo celular, com reconhecimento facial e
-GPS, funcionando **offline** e sincronizando automaticamente com o servidor
-(`https://kallahari.com.br/ponto`) assim que a conexão voltar.
+GPS, funcionando **offline** e sincronizando automaticamente assim que a conexão voltar. Um único APK
+serve **qualquer empresa** que use o sistema PontoFácil — cada uma com seu próprio "Código da Empresa".
 
 ## Como funciona
 
-1. **Primeira vez**: o funcionário busca o próprio nome (precisa estar online), confirma quem é, e o
+0. **Código da Empresa** (só na primeiríssima abertura do app): o funcionário digita o código de 6
+   caracteres fornecido pelo administrador (gerado em Configurações > Módulo Web, no painel web da
+   empresa). O app consulta um diretório central (`kallahari.com.br/ponto-directory`) que devolve o
+   endereço do servidor daquela empresa especificamente — assim o mesmo APK funciona pra qualquer
+   cliente, e se o endereço de uma empresa mudar (troca de domínio/pasta), os celulares já instalados
+   descobrem o endereço novo sozinhos, sem precisar digitar o código de novo.
+1. **Primeira vez (por funcionário)**: busca o próprio nome (precisa estar online), confirma quem é, e o
    app vincula esse celular a ele permanentemente. O reconhecimento facial já cadastrado no sistema é
    baixado e guardado no aparelho.
 2. **Uso do dia a dia**: toca no botão, o app reconhece o rosto (offline, usando o que foi salvo no
@@ -62,3 +68,15 @@ O app conversa com os mesmos endpoints já usados pelo quiosque web
   ponto foi batido offline e está sendo sincronizado depois, pra registrar a hora real em que aconteceu
   (não a hora em que a sincronização chegou no servidor). Se esses campos não forem enviados (como no
   quiosque web atual), o comportamento não muda.
+
+## Multi-empresa: diretório central
+
+`https://kallahari.com.br/ponto-directory/` é um serviço pequeno e separado (banco SQLite próprio) que
+mapeia `código da empresa → URL da API daquela empresa`:
+
+- `resolver.php?codigo=XXXXXX` — usado pelo app pra descobrir o endereço do servidor. Sem autenticação
+  (é só leitura, não expõe nada sensível).
+- `registrar.php` — usado pelo painel **Configurações > Módulo Web** de cada instalação (servidor a
+  servidor, nunca pelo navegador) pra criar/atualizar sua própria entrada. Protegido por um token gerado
+  junto com o código — só quem tem acesso ao painel daquela empresa consegue atualizar a URL registrada
+  para o código dela.

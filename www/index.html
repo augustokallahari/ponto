@@ -9,8 +9,23 @@
 </head>
 <body>
 
+<!-- ============ TELA: CÓDIGO DA EMPRESA (primeiríssima tela) ============ -->
+<section id="tela-codigo-empresa" class="tela">
+  <div class="logo">PONTO<span>FÁCIL</span></div>
+  <p class="subtitulo">Digite o código da sua empresa (fornecido pelo administrador do sistema) para
+    começar.</p>
+
+  <div class="campo-busca">
+    <input type="text" id="input-codigo-empresa" placeholder="Ex: A3F9K2" maxlength="6"
+           autocomplete="off" autocapitalize="characters" style="text-align:center;letter-spacing:4px;font-size:1.3rem;text-transform:uppercase">
+  </div>
+
+  <button id="btn-confirmar-codigo-empresa" class="btn btn-primario">Continuar</button>
+  <p id="erro-codigo-empresa" class="mensagem-erro oculto"></p>
+</section>
+
 <!-- ============ TELA: PAREAMENTO (primeira vez) ============ -->
-<section id="tela-pareamento" class="tela">
+<section id="tela-pareamento" class="tela oculto">
   <div class="logo">PONTO<span>FÁCIL</span></div>
   <p class="subtitulo">Vamos vincular este celular a você. Isso só precisa ser feito uma vez.</p>
 
@@ -75,7 +90,11 @@
 
   <div id="resumo-hoje" class="resumo-hoje"></div>
 
-  <button id="btn-desvincular" class="btn-link muted">Desvincular este celular</button>
+  <div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap">
+    <button id="btn-desvincular" class="btn-link muted">Desvincular este celular</button>
+    <span class="muted">·</span>
+    <button id="btn-trocar-empresa" class="btn-link muted">Trocar empresa</button>
+  </div>
 </section>
 
 <div id="toast" class="toast oculto"></div>

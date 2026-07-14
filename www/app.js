@@ -4,12 +4,23 @@
 // fila de sincronização quando a conexão volta.
 // ===========================================================
 
-const API_BASE = 'https://kallahari.com.br/ponto/api/';
+// Único endereço fixo no app: o diretório central, que nunca muda porque é o
+// domínio do próprio revendedor. Toda instalação de cliente (empresa) registra
+// sua própria URL aqui através da tela de Configurações > Módulo Web.
+const DIRETORIO_URL = 'https://kallahari.com.br/ponto-directory/resolver.php';
+const REVALIDAR_EMPRESA_A_CADA_MS = 6 * 60 * 60 * 1000; // 6 horas
+
+const LS_CODIGO_EMPRESA = 'pf_codigo_empresa';
+const LS_API_BASE       = 'pf_api_base';
+const LS_EMPRESA_NOME   = 'pf_empresa_nome';
+const LS_EMPRESA_REVALIDADA_EM = 'pf_empresa_revalidada_em';
 
 const LS_FUNCIONARIO   = 'pf_funcionario';
 const LS_DESCRIPTORS   = 'pf_descriptors';
 const LS_FILA          = 'pf_fila_pendente';
 const LS_HOJE          = 'pf_hoje_local';
+
+let API_BASE = null; // definido dinamicamente após resolver o código da empresa
 
 const SEQUENCIA = ['entrada', 'saida_almoco', 'retorno_almoco', 'saida'];
 const NOMES_TIPO = {
@@ -61,6 +72,7 @@ function distanciaEuclidiana(a, b) {
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
+  API_BASE = lerJSON(LS_API_BASE, null);
   funcionario = lerJSON(LS_FUNCIONARIO, null);
   descriptorsLocais = lerJSON(LS_DESCRIPTORS, []);
   filaPendente = lerJSON(LS_FILA, []);
@@ -73,7 +85,9 @@ async function init() {
   setInterval(atualizarRelogio, 1000);
   atualizarRelogio();
 
-  if (funcionario) {
+  if (!API_BASE) {
+    mostrarTelaCodigoEmpresa();
+  } else if (funcionario) {
     mostrarTelaPrincipal();
   } else {
     mostrarTelaPareamento();
@@ -111,9 +125,98 @@ function atualizarRelogio() {
 }
 
 // ===========================================================
+// TELA 0 — CÓDIGO DA EMPRESA
+// ===========================================================
+function mostrarTelaCodigoEmpresa() {
+  document.getElementById('tela-codigo-empresa').classList.remove('oculto');
+  document.getElementById('tela-pareamento').classList.add('oculto');
+  document.getElementById('tela-principal').classList.add('oculto');
+  document.getElementById('tela-cadastro-facial').classList.add('oculto');
+
+  const input = document.getElementById('input-codigo-empresa');
+  input.addEventListener('input', () => {
+    input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  });
+
+  document.getElementById('btn-confirmar-codigo-empresa').addEventListener('click', () => {
+    confirmarCodigoEmpresa(input.value.trim());
+  });
+}
+
+async function confirmarCodigoEmpresa(codigo) {
+  const erroEl = document.getElementById('erro-codigo-empresa');
+  const btn = document.getElementById('btn-confirmar-codigo-empresa');
+  erroEl.classList.add('oculto');
+
+  if (codigo.length !== 6) {
+    erroEl.textContent = 'O código tem 6 caracteres.';
+    erroEl.classList.remove('oculto');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Verificando...';
+
+  try {
+    const r = await fetch(`${DIRETORIO_URL}?codigo=${encodeURIComponent(codigo)}`);
+    const data = await r.json();
+    if (!data.ok) {
+      throw new Error(data.erro || 'Código não encontrado');
+    }
+    salvarJSON(LS_CODIGO_EMPRESA, codigo);
+    salvarJSON(LS_API_BASE, data.api_base);
+    salvarJSON(LS_EMPRESA_NOME, data.nome || '');
+    salvarJSON(LS_EMPRESA_REVALIDADA_EM, Date.now());
+    API_BASE = data.api_base;
+    mostrarTelaPareamento();
+  } catch (e) {
+    erroEl.textContent = 'Não foi possível confirmar este código. Verifique sua conexão e o código digitado.';
+    erroEl.classList.remove('oculto');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Continuar';
+  }
+}
+
+// Reconsulta o diretório central em segundo plano pra pegar mudanças de URL da
+// empresa sem exigir que o funcionário digite o código de novo.
+async function revalidarEmpresa() {
+  const codigo = lerJSON(LS_CODIGO_EMPRESA, null);
+  if (!codigo || navigator.onLine === false) return;
+
+  const ultimaRevalidacao = lerJSON(LS_EMPRESA_REVALIDADA_EM, 0);
+  if (Date.now() - ultimaRevalidacao < REVALIDAR_EMPRESA_A_CADA_MS) return;
+
+  try {
+    const r = await fetch(`${DIRETORIO_URL}?codigo=${encodeURIComponent(codigo)}`);
+    const data = await r.json();
+    if (data.ok && data.api_base && data.api_base !== API_BASE) {
+      API_BASE = data.api_base;
+      salvarJSON(LS_API_BASE, data.api_base);
+      salvarJSON(LS_EMPRESA_NOME, data.nome || '');
+    }
+    salvarJSON(LS_EMPRESA_REVALIDADA_EM, Date.now());
+  } catch (e) {
+    // sem conexão ou diretório fora do ar — tenta de novo na próxima sincronização
+  }
+}
+
+function trocarEmpresa() {
+  if (!confirm('Trocar de empresa? Você vai precisar digitar o código da empresa e buscar seu nome de novo.')) return;
+  localStorage.removeItem(LS_CODIGO_EMPRESA);
+  localStorage.removeItem(LS_API_BASE);
+  localStorage.removeItem(LS_EMPRESA_NOME);
+  localStorage.removeItem(LS_EMPRESA_REVALIDADA_EM);
+  localStorage.removeItem(LS_FUNCIONARIO);
+  localStorage.removeItem(LS_DESCRIPTORS);
+  location.reload();
+}
+
+// ===========================================================
 // TELA 1 — PAREAMENTO
 // ===========================================================
 function mostrarTelaPareamento() {
+  document.getElementById('tela-codigo-empresa').classList.add('oculto');
   document.getElementById('tela-pareamento').classList.remove('oculto');
   document.getElementById('tela-principal').classList.add('oculto');
   document.getElementById('tela-cadastro-facial').classList.add('oculto');
@@ -216,6 +319,7 @@ function escapeHtml(s) {
 // TELA 2 — PRINCIPAL
 // ===========================================================
 async function mostrarTelaPrincipal() {
+  document.getElementById('tela-codigo-empresa').classList.add('oculto');
   document.getElementById('tela-pareamento').classList.add('oculto');
   document.getElementById('tela-cadastro-facial').classList.add('oculto');
   document.getElementById('tela-principal').classList.remove('oculto');
@@ -223,6 +327,7 @@ async function mostrarTelaPrincipal() {
   document.getElementById('nome-funcionario').textContent = funcionario.nome;
   document.getElementById('btn-sync-manual').addEventListener('click', tentarSincronizar);
   document.getElementById('btn-desvincular').addEventListener('click', desvincularAparelho);
+  document.getElementById('btn-trocar-empresa').addEventListener('click', trocarEmpresa);
 
   atualizarResumoHoje();
   atualizarBadgePendencias();
@@ -488,6 +593,8 @@ async function tentarEnviar(registro) {
 // ---------- Sincronização da fila ----------
 let sincronizando = false;
 async function tentarSincronizar() {
+  revalidarEmpresa();
+
   if (sincronizando || filaPendente.length === 0) return;
   if (navigator.onLine === false) return;
   sincronizando = true;
