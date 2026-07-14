@@ -38,6 +38,7 @@ let ultimaPosicao = null;
 let modeloCarregado = false;
 let detectando = false;
 let streamAtivo = null;
+let folhaPendenteToken = null;
 
 // ---------- utilidades ----------
 function hoje() {
@@ -350,6 +351,12 @@ async function mostrarTelaPrincipal() {
 
   document.getElementById('btn-bater-ponto').addEventListener('click', baterPonto);
   atualizarBotaoPrincipal();
+
+  // Tela de assinatura de folha via app — só existe em versões do APK que já
+  // têm esses elementos no index.html. Se não existir (aparelho com um APK
+  // mais antigo recebendo este app.js por atualização OTA), ignora sem quebrar.
+  document.getElementById('btn-abrir-folha')?.addEventListener('click', () => abrirTelaFolha(folhaPendenteToken));
+  verificarFolhaPendente();
 }
 
 // Busca o registro de ponto de hoje no servidor e reconstrói o estado local
@@ -667,4 +674,205 @@ async function tentarSincronizar() {
   }
 
   sincronizando = false;
+}
+
+// ===========================================================
+// TELA 3 — ASSINAR FOLHA DE PONTO
+// (o admin manda a "notificação" clicando em "Enviar p/ app" no painel —
+// isso só cria um token pendente; o app confere sozinho toda vez que abre.)
+// ===========================================================
+let folhaSigCtx = null;
+let folhaSigDesenhando = false;
+let folhaTemTraco = false;
+let folhaStream = null;
+let folhaFotoDataUrl = null;
+
+async function verificarFolhaPendente() {
+  const banner = document.getElementById('banner-folha-pendente');
+  if (!banner) return; // index.html antigo (sem essa tela ainda) — ignora
+  if (!funcionario || !API_BASE || navigator.onLine === false) return;
+  try {
+    const r = await fetch(`${API_BASE}folha_pendente.php?funcionario_id=${funcionario.id}`);
+    const data = await r.json();
+    if (data.pendente) {
+      folhaPendenteToken = data.token;
+      banner.classList.remove('oculto');
+    } else {
+      folhaPendenteToken = null;
+      banner.classList.add('oculto');
+    }
+  } catch (e) {
+    // sem conexão — não mostra nem esconde o banner, tenta de novo depois
+  }
+}
+
+async function abrirTelaFolha(token) {
+  if (!token) return;
+  document.getElementById('tela-principal').classList.add('oculto');
+  document.getElementById('tela-assinar-folha').classList.remove('oculto');
+  document.getElementById('folha-area-assinatura').classList.remove('oculto');
+  document.getElementById('folha-sucesso').classList.add('oculto');
+  document.getElementById('folha-erro').classList.add('oculto');
+
+  const cabecalho = document.getElementById('folha-cabecalho');
+  const resumo = document.getElementById('folha-resumo');
+  cabecalho.textContent = 'Carregando...';
+  resumo.innerHTML = '';
+
+  try {
+    const r = await fetch(`${API_BASE}folha_dados.php?token=${encodeURIComponent(token)}`);
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.erro || 'Não foi possível carregar a folha');
+
+    const [ano, mesNum] = data.mes.split('-');
+    const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    cabecalho.textContent = `${nomesMes[parseInt(mesNum, 10) - 1]} de ${ano}`;
+    resumo.innerHTML = `
+      <div class="item"><span class="valor" style="color:var(--accent)">${data.diasTrabalhados}</span><span>Dias trabalhados</span></div>
+      <div class="item"><span class="valor" style="color:var(--danger)">${data.faltas}</span><span>Faltas</span></div>
+      <div class="item"><span class="valor">${data.totalHoras}</span><span>Total horas</span></div>
+    `;
+
+    iniciarCanvasAssinatura();
+    await iniciarCameraFolha();
+  } catch (e) {
+    document.getElementById('folha-erro').textContent = e.message;
+    document.getElementById('folha-erro').classList.remove('oculto');
+    document.getElementById('folha-area-assinatura').classList.add('oculto');
+  }
+}
+
+function fecharTelaFolha() {
+  if (folhaStream) { folhaStream.getTracks().forEach((t) => t.stop()); folhaStream = null; }
+  document.getElementById('tela-assinar-folha').classList.add('oculto');
+  document.getElementById('tela-principal').classList.remove('oculto');
+}
+
+function iniciarCanvasAssinatura() {
+  const canvas = document.getElementById('folha-sig-canvas');
+  folhaSigCtx = canvas.getContext('2d');
+  folhaTemTraco = false;
+  document.getElementById('folha-sig-placeholder').style.display = 'flex';
+
+  function ajustar() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * devicePixelRatio;
+    canvas.height = rect.height * devicePixelRatio;
+    folhaSigCtx.scale(devicePixelRatio, devicePixelRatio);
+    folhaSigCtx.lineWidth = 2.4;
+    folhaSigCtx.lineCap = 'round';
+    folhaSigCtx.strokeStyle = '#111';
+  }
+  ajustar();
+
+  function posDoEvento(e) {
+    const rect = canvas.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+  }
+  function iniciarTraco(e) {
+    e.preventDefault();
+    folhaSigDesenhando = true;
+    folhaTemTraco = true;
+    document.getElementById('folha-sig-placeholder').style.display = 'none';
+    const p = posDoEvento(e);
+    folhaSigCtx.beginPath();
+    folhaSigCtx.moveTo(p.x, p.y);
+    atualizarBotaoConfirmarFolha();
+  }
+  function tracar(e) {
+    if (!folhaSigDesenhando) return;
+    e.preventDefault();
+    const p = posDoEvento(e);
+    folhaSigCtx.lineTo(p.x, p.y);
+    folhaSigCtx.stroke();
+  }
+  function pararTraco() { folhaSigDesenhando = false; }
+
+  canvas.onmousedown = iniciarTraco;
+  canvas.onmousemove = tracar;
+  window.onmouseup = pararTraco;
+  canvas.ontouchstart = iniciarTraco;
+  canvas.ontouchmove = tracar;
+  canvas.ontouchend = pararTraco;
+
+  document.getElementById('btn-limpar-assinatura').onclick = () => {
+    folhaSigCtx.clearRect(0, 0, canvas.width, canvas.height);
+    folhaTemTraco = false;
+    document.getElementById('folha-sig-placeholder').style.display = 'flex';
+    atualizarBotaoConfirmarFolha();
+  };
+}
+
+async function iniciarCameraFolha() {
+  const video = document.getElementById('folha-video');
+  const preview = document.getElementById('folha-foto-preview');
+  preview.classList.add('oculto');
+  video.classList.remove('oculto');
+  folhaFotoDataUrl = null;
+  try {
+    folhaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 480, height: 480 } });
+    video.srcObject = folhaStream;
+  } catch (e) {
+    mostrarToast('Não foi possível acessar a câmera.', 'erro');
+  }
+
+  document.getElementById('btn-capturar-foto-folha').onclick = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 320; canvas.height = 320;
+    const ctx = canvas.getContext('2d');
+    ctx.save(); ctx.scale(-1, 1); ctx.drawImage(video, -320, 0, 320, 320); ctx.restore();
+    folhaFotoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    preview.src = folhaFotoDataUrl;
+    preview.classList.remove('oculto');
+    video.classList.add('oculto');
+    if (folhaStream) { folhaStream.getTracks().forEach((t) => t.stop()); folhaStream = null; }
+    atualizarBotaoConfirmarFolha();
+  };
+
+  document.getElementById('btn-confirmar-folha').onclick = confirmarAssinaturaFolha;
+  document.getElementById('btn-voltar-folha').onclick = fecharTelaFolha;
+  document.getElementById('btn-fechar-folha-sucesso').onclick = () => {
+    fecharTelaFolha();
+    verificarFolhaPendente();
+  };
+}
+
+function atualizarBotaoConfirmarFolha() {
+  document.getElementById('btn-confirmar-folha').disabled = !(folhaTemTraco && folhaFotoDataUrl);
+}
+
+async function confirmarAssinaturaFolha() {
+  const canvas = document.getElementById('folha-sig-canvas');
+  const btn = document.getElementById('btn-confirmar-folha');
+  if (!folhaTemTraco || !folhaFotoDataUrl) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Enviando...';
+
+  try {
+    // assinar_folha.php vive na raiz do sistema, não em api/ — API_BASE termina em ".../api/".
+    const urlAssinatura = API_BASE.replace(/api\/?$/, '') + 'assinar_folha.php';
+    const r = await fetch(urlAssinatura, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: folhaPendenteToken,
+        assinatura: canvas.toDataURL('image/png'),
+        foto: folhaFotoDataUrl,
+      }),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      document.getElementById('folha-area-assinatura').classList.add('oculto');
+      document.getElementById('folha-sucesso').classList.remove('oculto');
+      folhaPendenteToken = null;
+    } else {
+      throw new Error(data.erro || 'Falha ao salvar assinatura');
+    }
+  } catch (e) {
+    document.getElementById('folha-erro').textContent = e.message;
+    document.getElementById('folha-erro').classList.remove('oculto');
+    btn.disabled = false;
+    btn.textContent = '✅ Confirmar Assinatura';
+  }
 }

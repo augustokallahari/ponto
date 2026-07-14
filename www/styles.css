@@ -123,6 +123,53 @@ header {
   flex-wrap: wrap;
 }
 
+.banner-folha {
+  background: rgba(124,111,255,.1);
+  border: 1px solid rgba(124,111,255,.35);
+  color: var(--accent2);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: .85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.folha-cabecalho { font-weight: 600; text-align: center; }
+
+.folha-resumo {
+  display: flex;
+  justify-content: space-around;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: .85rem;
+}
+.folha-resumo .item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.folha-resumo .valor { font-weight: 700; font-size: 1.1rem; }
+
+.sig-wrap {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+#folha-sig-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.sig-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: .9rem;
+  pointer-events: none;
+}
+
 .camera-wrapper {
   position: relative;
   width: 100%;

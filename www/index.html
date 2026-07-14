@@ -72,6 +72,11 @@
     <button id="btn-sync-manual" class="btn-link">sincronizar agora</button>
   </div>
 
+  <div id="banner-folha-pendente" class="banner-folha oculto">
+    📋 Você tem uma folha de ponto pendente de assinatura
+    <button id="btn-abrir-folha" class="btn-link">Assinar agora</button>
+  </div>
+
   <div class="camera-wrapper">
     <video id="video" autoplay muted playsinline></video>
     <canvas id="canvas-overlay"></canvas>
@@ -93,6 +98,42 @@
     <button id="btn-desvincular" class="btn-link muted">Desvincular este celular</button>
     <span class="muted">·</span>
     <button id="btn-trocar-empresa" class="btn-link muted">Trocar empresa</button>
+  </div>
+</section>
+
+<!-- ============ TELA: ASSINAR FOLHA DE PONTO ============ -->
+<section id="tela-assinar-folha" class="tela oculto">
+  <button id="btn-voltar-folha" class="btn-link muted" style="align-self:flex-start">← Voltar</button>
+  <div class="logo pequeno">ASSINAR FOLHA</div>
+  <div id="folha-cabecalho" class="folha-cabecalho"></div>
+
+  <div id="folha-resumo" class="folha-resumo"></div>
+
+  <div id="folha-erro" class="mensagem-erro oculto"></div>
+
+  <div id="folha-area-assinatura">
+    <div class="subtitulo">Assine no quadro abaixo com o dedo:</div>
+    <div class="sig-wrap">
+      <canvas id="folha-sig-canvas"></canvas>
+      <div id="folha-sig-placeholder" class="sig-placeholder">Assine aqui</div>
+    </div>
+    <button id="btn-limpar-assinatura" class="btn-link">🗑 Limpar assinatura</button>
+
+    <div class="subtitulo" style="margin-top:10px">Tire uma foto para confirmar sua identidade:</div>
+    <div class="camera-wrapper" style="max-height:35vh">
+      <video id="folha-video" autoplay muted playsinline></video>
+      <img id="folha-foto-preview" class="oculto" style="width:100%;height:100%;object-fit:cover">
+    </div>
+    <button id="btn-capturar-foto-folha" class="btn btn-secundario">📷 Capturar foto</button>
+
+    <button id="btn-confirmar-folha" class="btn-bater-ponto" disabled>✅ Confirmar Assinatura</button>
+  </div>
+
+  <div id="folha-sucesso" class="card-confirmacao oculto">
+    <p>🎉</p>
+    <h2>Assinatura confirmada!</h2>
+    <p class="muted">Sua folha de ponto foi assinada com sucesso.</p>
+    <button id="btn-fechar-folha-sucesso" class="btn btn-primario">Voltar</button>
   </div>
 </section>
 
