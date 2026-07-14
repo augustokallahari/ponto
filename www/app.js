@@ -329,6 +329,12 @@ async function mostrarTelaPrincipal() {
   document.getElementById('btn-desvincular').addEventListener('click', desvincularAparelho);
   document.getElementById('btn-trocar-empresa').addEventListener('click', trocarEmpresa);
 
+  // Puxa o progresso real do dia no servidor — sem isso, o app só sabia dos
+  // pontos batidos por ele mesmo e voltava a oferecer "Bater Entrada" mesmo
+  // quando o funcionário já tinha batido ponto (por outro aparelho, ou depois
+  // de reinstalar o app).
+  await buscarPontoHojeDoServidor();
+
   atualizarResumoHoje();
   atualizarBadgePendencias();
   iniciarGPS();
@@ -337,6 +343,36 @@ async function mostrarTelaPrincipal() {
 
   document.getElementById('btn-bater-ponto').addEventListener('click', baterPonto);
   atualizarBotaoPrincipal();
+}
+
+// Busca o registro de ponto de hoje no servidor e reconstrói o estado local
+// (hojeLocal) a partir dele — servidor é sempre a fonte da verdade. Preserva
+// qualquer batida que ainda esteja só na fila de sincronização (offline),
+// pra não "esquecer" um ponto que o funcionário acabou de bater sem internet.
+async function buscarPontoHojeDoServidor() {
+  if (!funcionario || !API_BASE || navigator.onLine === false) return;
+
+  try {
+    const r = await fetch(`${API_BASE}get_ponto.php?id=${funcionario.id}`);
+    const data = await r.json();
+    const ponto = data.ponto;
+
+    const tiposNaFila = new Set(filaPendente.map((p) => p.tipo));
+    const novoHoje = { data: hoje() };
+    SEQUENCIA.forEach((t) => {
+      if (ponto && ponto[t]) {
+        novoHoje[t] = ponto[t];
+      } else if (tiposNaFila.has(t)) {
+        novoHoje[t] = hojeLocal[t] || null; // ainda pendente de sincronizar, mantém local
+      } else {
+        novoHoje[t] = null;
+      }
+    });
+    hojeLocal = novoHoje;
+    salvarJSON(LS_HOJE, hojeLocal);
+  } catch (e) {
+    // sem conexão ou servidor fora do ar — mantém o estado local como está
+  }
 }
 
 function desvincularAparelho() {
