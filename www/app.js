@@ -22,7 +22,11 @@ const LS_HOJE          = 'pf_hoje_local';
 
 let API_BASE = null; // definido dinamicamente após resolver o código da empresa
 
-const SEQUENCIA = ['entrada', 'saida_almoco', 'retorno_almoco', 'saida'];
+const SEQUENCIA_COMPLETA = ['entrada', 'saida_almoco', 'retorno_almoco', 'saida'];
+const SEQUENCIA_MEIO_PERIODO = ['entrada', 'saida'];
+function sequenciaAtual() {
+  return (funcionario && funcionario.meio_periodo == 1) ? SEQUENCIA_MEIO_PERIODO : SEQUENCIA_COMPLETA;
+}
 const NOMES_TIPO = {
   entrada: 'Entrada',
   saida_almoco: 'Saída Almoço',
@@ -371,9 +375,16 @@ async function buscarPontoHojeDoServidor() {
     const data = await r.json();
     const ponto = data.ponto;
 
+    // Mantém o funcionário local atualizado (ex: meio_periodo pode ter mudado
+    // no painel admin depois do pareamento inicial).
+    if (data.funcionario && data.funcionario.meio_periodo !== undefined) {
+      funcionario.meio_periodo = data.funcionario.meio_periodo;
+      salvarJSON(LS_FUNCIONARIO, funcionario);
+    }
+
     const tiposNaFila = new Set(filaPendente.map((p) => p.tipo));
     const novoHoje = { data: hoje() };
-    SEQUENCIA.forEach((t) => {
+    sequenciaAtual().forEach((t) => {
       if (ponto && ponto[t]) {
         novoHoje[t] = ponto[t];
       } else if (tiposNaFila.has(t)) {
@@ -401,7 +412,7 @@ function proximoTipo() {
     hojeLocal = { data: hoje(), entrada: null, saida_almoco: null, retorno_almoco: null, saida: null };
     salvarJSON(LS_HOJE, hojeLocal);
   }
-  return SEQUENCIA.find((t) => !hojeLocal[t]) || null;
+  return sequenciaAtual().find((t) => !hojeLocal[t]) || null;
 }
 
 function atualizarBotaoPrincipal() {
@@ -419,7 +430,7 @@ function atualizarBotaoPrincipal() {
 function atualizarResumoHoje() {
   const el = document.getElementById('resumo-hoje');
   const idsPendentesPorTipo = new Set(filaPendente.map((p) => p.tipo));
-  el.innerHTML = SEQUENCIA.map((t) => {
+  el.innerHTML = sequenciaAtual().map((t) => {
     const feito = !!hojeLocal[t];
     const pendente = idsPendentesPorTipo.has(t);
     const cls = pendente ? 'pendente-sync' : (feito ? 'feito' : '');
