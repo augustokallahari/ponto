@@ -243,10 +243,6 @@ function mostrarTelaPareamento() {
   document.getElementById('btn-cancelar-pareamento').addEventListener('click', () => {
     document.getElementById('confirmacao-pareamento').classList.add('oculto');
   });
-
-  document.getElementById('btn-pular-facial').addEventListener('click', () => {
-    mostrarTelaPrincipal();
-  });
 }
 
 let candidatoPareamento = null;
@@ -309,15 +305,156 @@ async function confirmarPareamento() {
       salvarJSON(LS_DESCRIPTORS, descriptorsLocais);
       mostrarTelaPrincipal();
     } else {
-      // Sem rosto cadastrado ainda — avisa e deixa continuar (vai poder usar quando o admin cadastrar).
+      // Sem rosto cadastrado ainda — cadastro é obrigatório antes de continuar.
       document.getElementById('tela-pareamento').classList.add('oculto');
       document.getElementById('tela-cadastro-facial').classList.remove('oculto');
+      iniciarCadastroFacialObrigatorio();
     }
   } catch (e) {
     erroEl.textContent = 'Falha ao vincular. Verifique sua conexão e tente novamente.';
     erroEl.classList.remove('oculto');
     btn.disabled = false;
     btn.textContent = 'Sim, sou eu';
+  }
+}
+
+// ===========================================================
+// CADASTRO FACIAL OBRIGATÓRIO (funcionário sem biometria ainda)
+// ===========================================================
+const CADASTRO_FACIAL_MIN_FOTOS = 3;
+let cadastroFacialStream = null;
+let cadastroFacialDescriptors = [];
+
+async function iniciarCadastroFacialObrigatorio() {
+  cadastroFacialDescriptors = [];
+  atualizarContadorCadastroFacial();
+
+  const statusEl = document.getElementById('status-camera-cadastro');
+  const btnCapturar = document.getElementById('btn-capturar-cadastro');
+  const erroEl = document.getElementById('erro-cadastro-facial');
+  erroEl.classList.add('oculto');
+  btnCapturar.disabled = true;
+  btnCapturar.onclick = capturarFotoCadastroFacial;
+
+  try {
+    const video = document.getElementById('video-cadastro');
+    cadastroFacialStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: 480, height: 640 },
+    });
+    video.srcObject = cadastroFacialStream;
+  } catch (e) {
+    statusEl.textContent = 'Não foi possível acessar a câmera. Verifique as permissões do app.';
+    statusEl.className = 'status-camera erro';
+    return;
+  }
+
+  if (!modeloCarregado) {
+    statusEl.textContent = 'Carregando reconhecimento facial...';
+    statusEl.className = 'status-camera detectando';
+    try {
+      await faceapi.nets.tinyFaceDetector.loadFromUri('./models');
+      await faceapi.nets.faceLandmark68Net.loadFromUri('./models');
+      await faceapi.nets.faceRecognitionNet.loadFromUri('./models');
+      modeloCarregado = true;
+    } catch (e) {
+      statusEl.textContent = 'Falha ao carregar reconhecimento facial. Tente novamente.';
+      statusEl.className = 'status-camera erro';
+      return;
+    }
+  }
+
+  statusEl.textContent = `Posicione seu rosto e capture ${CADASTRO_FACIAL_MIN_FOTOS} fotos.`;
+  statusEl.className = 'status-camera aguardando';
+  btnCapturar.disabled = false;
+}
+
+function atualizarContadorCadastroFacial() {
+  const contador = document.getElementById('contador-fotos-cadastro');
+  contador.textContent = `${cadastroFacialDescriptors.length} de ${CADASTRO_FACIAL_MIN_FOTOS} fotos capturadas`;
+}
+
+async function capturarFotoCadastroFacial() {
+  const video = document.getElementById('video-cadastro');
+  const statusEl = document.getElementById('status-camera-cadastro');
+  const scanLine = document.getElementById('scan-line-cadastro');
+  const btnCapturar = document.getElementById('btn-capturar-cadastro');
+  const erroEl = document.getElementById('erro-cadastro-facial');
+  erroEl.classList.add('oculto');
+
+  btnCapturar.disabled = true;
+  scanLine.classList.add('ativo');
+  statusEl.textContent = 'Detectando rosto...';
+  statusEl.className = 'status-camera detectando';
+
+  try {
+    const opcoes = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+    const deteccao = await faceapi
+      .detectSingleFace(video, opcoes)
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if (!deteccao) {
+      throw new Error('Nenhum rosto detectado. Aproxime-se e tente novamente.');
+    }
+
+    cadastroFacialDescriptors.push(Array.from(deteccao.descriptor));
+    atualizarContadorCadastroFacial();
+
+    if (cadastroFacialDescriptors.length >= CADASTRO_FACIAL_MIN_FOTOS) {
+      await finalizarCadastroFacialObrigatorio();
+      return;
+    }
+
+    statusEl.textContent = `Foto ${cadastroFacialDescriptors.length} capturada! Mude levemente o ângulo e capture a próxima.`;
+    statusEl.className = 'status-camera aguardando';
+  } catch (e) {
+    statusEl.textContent = e.message || 'Falha ao capturar. Tente novamente.';
+    statusEl.className = 'status-camera erro';
+  } finally {
+    scanLine.classList.remove('ativo');
+    btnCapturar.disabled = false;
+  }
+}
+
+async function finalizarCadastroFacialObrigatorio() {
+  const statusEl = document.getElementById('status-camera-cadastro');
+  const btnCapturar = document.getElementById('btn-capturar-cadastro');
+  const erroEl = document.getElementById('erro-cadastro-facial');
+
+  btnCapturar.disabled = true;
+  statusEl.textContent = 'Salvando cadastro facial...';
+  statusEl.className = 'status-camera detectando';
+
+  try {
+    const r = await fetch(`${API_BASE}salvar_descriptor.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        funcionario_id: funcionario.id,
+        descriptors: cadastroFacialDescriptors,
+      }),
+    });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.erro || 'Falha ao salvar o cadastro facial.');
+
+    descriptorsLocais = cadastroFacialDescriptors;
+    salvarJSON(LS_DESCRIPTORS, descriptorsLocais);
+
+    if (cadastroFacialStream) {
+      cadastroFacialStream.getTracks().forEach((t) => t.stop());
+      cadastroFacialStream = null;
+    }
+
+    mostrarTelaPrincipal();
+  } catch (e) {
+    erroEl.textContent = e.message || 'Falha ao salvar. Verifique sua conexão e tente novamente.';
+    erroEl.classList.remove('oculto');
+    statusEl.textContent = `Posicione seu rosto e capture ${CADASTRO_FACIAL_MIN_FOTOS} fotos.`;
+    statusEl.className = 'status-camera aguardando';
+    // Permite tentar de novo a última foto sem perder as anteriores.
+    cadastroFacialDescriptors.pop();
+    atualizarContadorCadastroFacial();
+    btnCapturar.disabled = false;
   }
 }
 

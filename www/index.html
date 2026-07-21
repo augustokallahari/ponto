@@ -46,12 +46,27 @@
   <p id="erro-pareamento" class="mensagem-erro oculto"></p>
 </section>
 
-<!-- ============ TELA: CADASTRO FACIAL (se ainda não tem rosto salvo) ============ -->
+<!-- ============ TELA: CADASTRO FACIAL (obrigatório se ainda não tem rosto salvo) ============ -->
 <section id="tela-cadastro-facial" class="tela oculto">
   <div class="logo">PONTO<span>FÁCIL</span></div>
-  <p class="subtitulo">Não encontramos seu rosto cadastrado no sistema. Peça a um administrador para
-    cadastrar sua foto facial antes de usar o reconhecimento automático.</p>
-  <button id="btn-pular-facial" class="btn btn-secundario">Entendi, continuar mesmo assim</button>
+  <p class="subtitulo">Não encontramos seu rosto cadastrado no sistema. Vamos cadastrar agora — tire
+    <strong>3 fotos</strong> em ângulos ou iluminação levemente diferentes.</p>
+
+  <div class="camera-wrapper">
+    <video id="video-cadastro" autoplay muted playsinline></video>
+    <canvas id="canvas-overlay-cadastro"></canvas>
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+    <div id="scan-line-cadastro" class="scan-line"></div>
+  </div>
+
+  <div id="status-camera-cadastro" class="status-camera aguardando">Iniciando câmera...</div>
+  <div id="contador-fotos-cadastro" class="subtitulo" style="margin:8px 0">0 de 3 fotos capturadas</div>
+
+  <button id="btn-capturar-cadastro" class="btn btn-primario" disabled>Capturar Foto</button>
+  <p id="erro-cadastro-facial" class="mensagem-erro oculto"></p>
 </section>
 
 <!-- ============ TELA: PRINCIPAL ============ -->
